@@ -1117,7 +1117,10 @@ def prepare_rtems_cross(epics_arch, version):
     print("Cross compiler RTEMS{0} @ {1}".format(version, epics_arch))
 
     if ci["os"] == "linux":
-        download_rtems(version, rtems_bsp)
+        if version == "6":
+            build_rtems(version, rtems_bsp)
+        else:
+            download_rtems(version, rtems_bsp)
 
     edit_make_file(
         "a",
@@ -1165,6 +1168,53 @@ def download_rtems(version, rtems_bsp):
     )
     os.remove(os.path.join(toolsdir, tar_name))
     for rtems_cc in glob("/opt/rtems/*/bin/*-gcc"):
+        print("{0}{1} --version{2}".format(ANSI_CYAN, rtems_cc, ANSI_RESET))
+        sys.stdout.flush()
+        sp.check_call([rtems_cc, "--version"])
+
+
+def build_rtems(version, rtems_bsp):
+    rsb_source = os.environ.get(
+        "RSB_SOURCE",
+        "https://ftp.rtems.org/pub/rtems/releases/6/6.3/sources/rtems-source-builder-6.3.tar.xz",
+    )
+    rtems_arch = {"pc686": "i386"}[rtems_bsp]
+    tar_name = rsb_source.split("/")[-1]
+    rsb_dir = os.path.join(toolsdir, tar_name.split(".tar")[0])
+    rtems_prefix = "/opt/rtems/" + version
+    rsb_cmd = [
+        os.path.join(rsb_dir, "source-builder", "sb-set-builder"),
+        "--prefix=" + rtems_prefix,
+    ]
+    bsp_args = [
+        "--target={0}-rtems{1}".format(rtems_arch, version),
+        "--with-rtems-bsp={0}/{1}".format(rtems_arch, rtems_bsp),
+    ]
+    print("Building RTEMS {0} cross compiler for {1}/{2} from {3}".format(
+        version, rtems_arch, rtems_bsp, rsb_source))
+    sys.stdout.flush()
+    sp.check_call(ci["sudo"] + ["apt-get", "-y", "update"])
+    sp.check_call(
+        ci["sudo"]
+        + ["apt-get", "install", "-y", "-qq",
+           "bison", "flex", "texinfo", "unzip", "python3-dev", "zlib1g-dev"]
+    )
+    sp.check_call(
+        ["curl", "-fsSL", "--retry", "3", "-o", tar_name, rsb_source],
+        cwd=toolsdir,
+    )
+    sp.check_call(["tar", "-xf", tar_name], cwd=toolsdir)
+    os.remove(os.path.join(toolsdir, tar_name))
+    sp.check_call([os.path.join(rsb_dir, "source-builder", "sb-check")], cwd=rsb_dir)
+    sp.check_call(ci["sudo"] + ["mkdir", "-p", rtems_prefix])
+    sp.check_call(
+        ci["sudo"] + ["chown", "{0}:{1}".format(os.getuid(), os.getgid()), rtems_prefix]
+    )
+    rsb_rtems = os.path.join(rsb_dir, "rtems")
+    sp.check_call(rsb_cmd + ["{0}/rtems-{1}".format(version, rtems_arch)], cwd=rsb_rtems)
+    sp.check_call(rsb_cmd + bsp_args + [version + "/rtems-kernel"], cwd=rsb_rtems)
+    sp.check_call(rsb_cmd + bsp_args + [version + "/rtems-libbsd-fb14"], cwd=rsb_rtems)
+    for rtems_cc in glob(rtems_prefix + "/bin/*-gcc"):
         print("{0}{1} --version{2}".format(ANSI_CYAN, rtems_cc, ANSI_RESET))
         sys.stdout.flush()
         sp.check_call([rtems_cc, "--version"])

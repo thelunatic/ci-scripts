@@ -177,6 +177,7 @@ jobs:
         - RTEMS-pc386-qemu@4.9
         - RTEMS-pc386-qemu@4.10
         - RTEMS-pc686-qemu@5
+        - RTEMS-pc686-qemu@6
         include:
         - cross: RTEMS-pc386-qemu@4.10
           test: NO

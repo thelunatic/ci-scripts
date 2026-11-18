@@ -297,7 +297,7 @@ Feel free to suggest more default settings using a Pull Request.
 
 ## RTEMS
 
-Cross-compiling to RTEMS versions 4.9, 4.10 or 5 is supported
+Cross-compiling to RTEMS versions 4.9, 4.10, 5 or 6 is supported
 on supported CI services. For configuration see below.
 Tests can also be run cross-platform, using `qemu`.
 
